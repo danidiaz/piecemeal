@@ -3,12 +3,13 @@
 An experiment in finding a generic way to handle HTTP PATCH updates for state
 kept in a server.
 
-The `defaultMain` function exported by the library takes a type-level map of
-field names to types, which defines a record. (This map can be derived from a
-regular record through generics, as in the example `piecemeal` executable). 
+The `defaultMain` function exported by the library takes as parameter a
+type-level map of field names to types, which defines a record. (This map can
+be derived from a regular record through generics, as in the example
+executable). 
 
-It then launches a server which keeps a record with "nullable" fields as state.
-The record starts with all fields set to `Nothing`. 
+It then launches a server which keeps a version of the record with "nullable"
+fields as state. The initial value has all the fields set to `Nothing`. 
 
 The url of the server is
 
