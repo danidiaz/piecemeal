@@ -11,6 +11,7 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module Piecemeal where
 
@@ -25,6 +26,7 @@ import Data.Profunctor (Star (..))
 import Data.RBR
 import Data.SOP
 import Data.SOP.NP (collapse_NP, cpure_NP, liftA2_NP, sequence_NP)
+import Data.SOP.NS (collapse_NS)
 import Data.String
 import GHC.TypeLits
 import Servant
@@ -99,5 +101,9 @@ piecemealApp ref = serve (Proxy @(PiecemealAPI t)) (consult :<|> patch)
             Just filled -> Left (Complete (fromNP filled))
             Nothing -> Right i
         )
-    patch i = liftIO $ do
-      undefined
+    patch (Piece (toNS -> piece)) = liftIO $ do
+      let adjust :: NP Maybe flat -> NP Maybe flat
+          adjust = collapse_NS $ hliftA2 _ (injections @flat) piece
+      modifyMVar_ ref $ return . Incomplete . fromNP . adjust . toNP . getIncomplete
+
+
