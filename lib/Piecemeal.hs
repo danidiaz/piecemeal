@@ -98,7 +98,13 @@ type PiecemealAPI (t :: Map Symbol Type) =
 
 newtype Mendo a = Mendo {getMendo :: Maybe a -> Maybe a}
 
-type Patcheable (t :: Map Symbol Type) flat = (KeysValuesAll KnownKey t, Productlike '[] t flat, Sumlike '[] t flat, All FromJSON flat, All ToJSON flat)
+type Patcheable (t :: Map Symbol Type) flat =
+  ( KeysValuesAll KnownKey t,
+    Productlike '[] t flat,
+    Sumlike '[] t flat,
+    All FromJSON flat,
+    All ToJSON flat
+  )
 
 -- https://hackage.haskell.org/package/servant-0.4.2/docs/Servant-API-Patch.html
 piecemealApp ::
@@ -129,10 +135,3 @@ defaultMain _ = do
   let port = 8081
   putStrLn $ "Listening on port " ++ show port
   run port (piecemealApp ref)
-
--- https://stackoverflow.com/questions/58573934/updating-an-n-ary-product-from-sop-core-with-a-compatible-sum
--- patch :: forall xs. SListI xs => NS I xs -> NP Maybe xs -> NP Maybe xs
--- patch piece =
---   let mendos :: NP Mendo xs
---       mendos = expand_NS (Mendo id) (liftA_NS (\(I x) -> Mendo (\_ -> Just x)) piece)
---    in liftA2_NP (\(Mendo f) x -> f x) mendos
