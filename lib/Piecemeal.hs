@@ -14,9 +14,14 @@
 
 module Piecemeal where
 
+import Data.Profunctor (Star(..))
 import Data.Aeson
+import Data.Aeson.Types
 import Data.RBR
-import Data.SOP
+import Data.SOP 
+import Data.SOP.NP (cpure_NP,collapse_NP,liftA2_NP)
+import Control.Applicative
+import Data.Foldable
 import Servant
 import Servant.API
 import GHC.TypeLits
@@ -49,10 +54,19 @@ instance (KeysValuesAll KnownKey t,Productlike '[] t flat, All ToJSON flat) =>
 
 newtype Piece (t :: Map Symbol Type)  = Piece { getPiece :: Variant I t }
 
-instance (Sumlike '[] t flat, All FromJSON flat) =>
-  FromJSON (Piece t)
-  where
-  parseJSON v = undefined
+instance (KeysValuesAll KnownKey t,Productlike '[] t flat, Sumlike '[] t flat, All FromJSON flat) =>
+    FromJSON (Piece t)
+    where
+    parseJSON = 
+        let fieldNames :: NP (K String) flat
+            fieldNames = toNP (demoteKeys @t)
+            fieldParsers = cpure_NP (Proxy @FromJSON) (Star parseJSON)
+            giveFieldName (K alias) (Star f) = Star (\o -> Data.Aeson.Types.explicitParseField f o (fromString alias))
+            branchParsers :: NP (Star Parser Object) flat
+            branchParsers = liftA2_NP giveFieldName fieldNames fieldParsers
+            injected = liftA2_NP (\f star -> K (unK . apFn f . I <$> star)) (injections @flat) branchParsers 
+            Star parser = asum $ collapse_NP injected
+         in withObject "piece" $ \o -> Piece . fromNS <$> parser o
 
 -- https://docs.servant.dev/en/stable/tutorial/ApiType.html
 type PiecemealAPI (t :: Map Symbol Type) =
