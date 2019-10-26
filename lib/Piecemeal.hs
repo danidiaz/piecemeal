@@ -1,3 +1,4 @@
+{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -6,14 +7,25 @@
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# OPTIONS_GHC -Wno-partial-type-signatures #-}
 
-module Piecemeal where
+module Piecemeal
+  ( Complete (..),
+    Incomplete (..),
+    Piece (..),
+    PiecemealAPI,
+    Patcheable,
+    piecemealApp,
+    defaultMain,
+  )
+where
 
 import Control.Applicative
 import Control.Concurrent.MVar
@@ -25,10 +37,12 @@ import Data.Kind
 import Data.Profunctor (Star (..))
 import Data.RBR
 import Data.SOP
-import Data.SOP.NP (collapse_NP, cpure_NP, liftA2_NP, sequence_NP)
-import Data.SOP.NS (collapse_NS)
+import Data.SOP.NP (collapse_NP, cpure_NP, liftA2_NP, pure_NP, sequence_NP)
+import Data.SOP.NS (collapse_NS, expand_NS, liftA_NS)
 import Data.String
 import GHC.TypeLits
+import Network.Wai
+import Network.Wai.Handler.Warp
 import Servant
 import Servant.API
 
@@ -82,14 +96,14 @@ type PiecemealAPI (t :: Map Symbol Type) =
            :<|> ReqBody '[JSON] (Piece t) :> Patch '[JSON] ()
        )
 
+newtype Mendo a = Mendo {getMendo :: Maybe a -> Maybe a}
+
+type Patcheable (t :: Map Symbol Type) flat = (KeysValuesAll KnownKey t, Productlike '[] t flat, Sumlike '[] t flat, All FromJSON flat, All ToJSON flat)
+
 -- https://hackage.haskell.org/package/servant-0.4.2/docs/Servant-API-Patch.html
--- _foo1 :: Handler (Either (Complete t) (Incomplete t))
---  _foo2 :: Piece t -> Handler ()
---  http://hackage.haskell.org/package/servant-server-0.16.2/docs/Servant-Server.html#t:Handler
---  runHandler' :: ExceptT ServerError IO a
 piecemealApp ::
   forall (t :: Map Symbol Type) flat.
-  (KeysValuesAll KnownKey t, Productlike '[] t flat, Sumlike '[] t flat, All FromJSON flat, All ToJSON flat) =>
+  Patcheable t flat =>
   MVar (Incomplete t) ->
   Application
 piecemealApp ref = serve (Proxy @(PiecemealAPI t)) (consult :<|> patch)
@@ -102,8 +116,23 @@ piecemealApp ref = serve (Proxy @(PiecemealAPI t)) (consult :<|> patch)
             Nothing -> Right i
         )
     patch (Piece (toNS -> piece)) = liftIO $ do
-      let adjust :: NP Maybe flat -> NP Maybe flat
-          adjust = collapse_NS $ hliftA2 _ (injections @flat) piece
+      -- https://stackoverflow.com/questions/58573934/updating-an-n-ary-product-from-sop-core-with-a-compatible-sum
+      let mendos :: NP Mendo flat
+          mendos = expand_NS (Mendo id) (liftA_NS (\(I x) -> Mendo (\_ -> Just x)) piece)
+          adjust :: NP Maybe flat -> NP Maybe flat
+          adjust = liftA2_NP (\(Mendo f) x -> f x) mendos
       modifyMVar_ ref $ return . Incomplete . fromNP . adjust . toNP . getIncomplete
 
+defaultMain :: forall t flat. Patcheable t flat => Proxy (t :: Map Symbol Type) -> IO ()
+defaultMain _ = do
+  ref <- newMVar (Incomplete (fromNP @t (pure_NP Nothing)))
+  let port = 8081
+  putStrLn $ "Listening on port " ++ show port
+  run port (piecemealApp ref)
 
+-- https://stackoverflow.com/questions/58573934/updating-an-n-ary-product-from-sop-core-with-a-compatible-sum
+-- patch :: forall xs. SListI xs => NS I xs -> NP Maybe xs -> NP Maybe xs
+-- patch piece =
+--   let mendos :: NP Mendo xs
+--       mendos = expand_NS (Mendo id) (liftA_NS (\(I x) -> Mendo (\_ -> Just x)) piece)
+--    in liftA2_NP (\(Mendo f) x -> f x) mendos
