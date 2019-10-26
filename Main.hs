@@ -6,7 +6,7 @@ module Main where
 import Piecemeal
 
 import Data.Proxy
-import Data.RBR
+import Data.RBR (ToRecord,RecordCode)
 import GHC.Generics
 
 data Person = Person { name :: String, age :: Int } 

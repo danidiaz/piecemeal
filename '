@@ -1,9 +1,11 @@
-{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -79,10 +81,9 @@ import Network.Wai.Handler.Warp (run)
 import Servant
 import Servant.API
 
--- Losts of boring constraints grouped here for simplicity.
--- "flat" is the flattened representation of the types in the Map.
-type Patcheable (t :: Map Symbol Type) (flat :: [Type]) =
-  ( KeysValuesAll KnownKey t, -- we can demote the keys
+-- Losts of boring easily satisfiable constraints grouped here for simplicity
+type Patcheable (t :: Map Symbol Type) flat =
+  ( KeysValuesAll KnownKey t,
     Productlike '[] t flat,
     Sumlike '[] t flat,
     All FromJSON flat,
