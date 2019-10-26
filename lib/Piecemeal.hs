@@ -94,8 +94,10 @@ piecemealApp ref = serve (Proxy @(PiecemealAPI t)) (consult :<|> patch)
   where
     consult = liftIO $ do
       i@(Incomplete current) <- readMVar ref
-      return (case sequence_NP (toNP current) of
-        Just filled -> Left (Complete (fromNP filled))
-        Nothing -> Right i)
+      return
+        ( case sequence_NP (toNP current) of
+            Just filled -> Left (Complete (fromNP filled))
+            Nothing -> Right i
+        )
     patch i = liftIO $ do
       undefined
