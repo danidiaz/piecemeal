@@ -99,7 +99,7 @@ instance
   toJSON (Complete r) =
     let fieldNames :: NP (K String) flat
         fieldNames = toNP (demoteKeys @t)
-        giveFieldName :: forall x kv . _ => K String x -> I x -> K kv x
+        giveFieldName :: forall x kv. _ => K String x -> I x -> K kv x
         giveFieldName (K alias) (I fieldValue) = K (fromString alias .= fieldValue)
         pairs :: NP (K Pair) flat
         pairs = hcliftA2 (Proxy @ToJSON) giveFieldName fieldNames (toNP r)
@@ -114,7 +114,7 @@ instance
   toJSON (Incomplete r) =
     let fieldNames :: NP (K String) flat
         fieldNames = toNP (demoteKeys @t)
-        giveFieldName :: forall x kv . _ => K String x -> Maybe x -> K kv x
+        giveFieldName :: forall x kv. _ => K String x -> Maybe x -> K kv x
         giveFieldName (K alias) maybeMissingFieldValue = K (fromString alias .= maybeMissingFieldValue)
         pairs :: NP (K Pair) flat
         pairs = hcliftA2 (Proxy @ToJSON) giveFieldName fieldNames (toNP r)
@@ -129,6 +129,7 @@ instance
   parseJSON =
     let fieldNames :: NP (K String) flat
         fieldNames = toNP (demoteKeys @t)
+        fieldParsers :: NP (Star Parser Value) flat
         fieldParsers = cpure_NP (Proxy @FromJSON) (Star parseJSON)
         giveFieldName :: K String b -> Star Parser Value c -> Star Parser Object c
         giveFieldName (K alias) (Star f) = Star (\o -> Data.Aeson.Types.explicitParseField f o (fromString alias))
