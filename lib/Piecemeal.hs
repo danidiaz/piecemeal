@@ -137,7 +137,7 @@ instance
         branchParsers :: NP (Star Parser Object) flat
         branchParsers = liftA2_NP giveFieldName fieldNames fieldParsers
         -- A product where each component is a parser for one of the sum type's branches.
-        -- Unlike with the previous produnct, the return value of each parser
+        -- Unlike with the previous product, the return value of each parser
         -- comes already injected in its proper branch.
         -- This means that the return value of the parsers is "uniform" and can
         -- be pulled into the annotation of the K functor.
