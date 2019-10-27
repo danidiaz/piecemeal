@@ -135,6 +135,8 @@ instance
         giveFieldName (K alias) (Star f) = Star (\o -> Data.Aeson.Types.explicitParseField f o (fromString alias))
         branchParsers :: NP (Star Parser Object) flat
         branchParsers = liftA2_NP giveFieldName fieldNames fieldParsers
+        -- A product where each component is a parser for one of the sum type's branches.
+        -- The return value of each parser comes already injected in its proper branch.
         injected :: NP (K (Star Parser Object (NS I flat))) flat
         injected = liftA2_NP (\f star -> K (unK . apFn f . I <$> star)) (injections @flat) branchParsers
         parser :: Object -> Parser (NS I flat)
