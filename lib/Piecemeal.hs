@@ -133,10 +133,14 @@ instance
         fieldParsers = cpure_NP (Proxy @FromJSON) (Star parseJSON)
         giveFieldName :: K String b -> Star Parser Value c -> Star Parser Object c
         giveFieldName (K alias) (Star f) = Star (\o -> Data.Aeson.Types.explicitParseField f o (fromString alias))
+        -- A product where each component is a parser for one of the sum type's branches.
         branchParsers :: NP (Star Parser Object) flat
         branchParsers = liftA2_NP giveFieldName fieldNames fieldParsers
         -- A product where each component is a parser for one of the sum type's branches.
-        -- The return value of each parser comes already injected in its proper branch.
+        -- Unlike with the previous produnct, the return value of each parser
+        -- comes already injected in its proper branch.
+        -- This means that the return value of the parsers is "uniform" and can
+        -- be pulled into the annotation of the K functor.
         injected :: NP (K (Star Parser Object (NS I flat))) flat
         injected = liftA2_NP (\f star -> K (unK . apFn f . I <$> star)) (injections @flat) branchParsers
         parser :: Object -> Parser (NS I flat)
