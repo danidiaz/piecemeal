@@ -4,12 +4,14 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# OPTIONS_GHC -Wno-partial-type-signatures #-}
 
 module Piecemeal
   ( Complete (..),
@@ -27,7 +29,8 @@ import Control.Concurrent.MVar
 import Control.Monad.IO.Class
 import Data.Aeson
 import Data.Aeson.Types
-  ( Parser,
+  ( Pair,
+    Parser,
     explicitParseField,
   )
 import Data.Foldable (asum)
@@ -96,7 +99,9 @@ instance
   toJSON (Complete r) =
     let fieldNames :: NP (K String) flat
         fieldNames = toNP (demoteKeys @t)
+        giveFieldName :: forall x kv . _ => K String x -> I x -> K kv x
         giveFieldName (K alias) (I fieldValue) = K (fromString alias .= fieldValue)
+        pairs :: NP (K Pair) flat
         pairs = hcliftA2 (Proxy @ToJSON) giveFieldName fieldNames (toNP r)
      in object (collapse_NP pairs)
 
@@ -109,7 +114,9 @@ instance
   toJSON (Incomplete r) =
     let fieldNames :: NP (K String) flat
         fieldNames = toNP (demoteKeys @t)
+        giveFieldName :: forall x kv . _ => K String x -> Maybe x -> K kv x
         giveFieldName (K alias) maybeMissingFieldValue = K (fromString alias .= maybeMissingFieldValue)
+        pairs :: NP (K Pair) flat
         pairs = hcliftA2 (Proxy @ToJSON) giveFieldName fieldNames (toNP r)
      in object (collapse_NP pairs)
 
@@ -123,10 +130,13 @@ instance
     let fieldNames :: NP (K String) flat
         fieldNames = toNP (demoteKeys @t)
         fieldParsers = cpure_NP (Proxy @FromJSON) (Star parseJSON)
+        giveFieldName :: K String b -> Star Parser Value c -> Star Parser Object c
         giveFieldName (K alias) (Star f) = Star (\o -> Data.Aeson.Types.explicitParseField f o (fromString alias))
         branchParsers :: NP (Star Parser Object) flat
         branchParsers = liftA2_NP giveFieldName fieldNames fieldParsers
+        injected :: NP (K (Star Parser Object (NS I flat))) flat
         injected = liftA2_NP (\f star -> K (unK . apFn f . I <$> star)) (injections @flat) branchParsers
+        parser :: Object -> Parser (NS I flat)
         Star parser = asum $ collapse_NP injected
      in withObject "piece" $ \o -> Piece . fromNS <$> parser o
 
